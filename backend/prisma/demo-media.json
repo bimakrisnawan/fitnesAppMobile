@@ -1,0 +1,233 @@
+{
+  "_howTo": [
+    "Paste a YouTube link (any format: watch?v=, youtu.be/, shorts/) into \"youtube\".",
+    "For images, put the file in backend/public/media/ and write just the file name in \"thumbnail\", e.g. \"full-body-basics.jpg\". A full https:// image URL also works.",
+    "Then run: npm run db:seed  (safe to re-run; it only updates content, demo accounts are recreated).",
+    "Leave a value empty to keep the placeholder."
+  ],
+  "exercises": {
+    "goblet-squat": {
+      "name": "Goblet Squat",
+      "search": "Goblet Squat exercise tutorial proper form",
+      "youtube": ""
+    },
+    "romanian-deadlift": {
+      "name": "Romanian Deadlift",
+      "search": "Romanian Deadlift exercise tutorial proper form",
+      "youtube": ""
+    },
+    "bulgarian-split-squat": {
+      "name": "Bulgarian Split Squat",
+      "search": "Bulgarian Split Squat exercise tutorial proper form",
+      "youtube": ""
+    },
+    "reverse-lunge": {
+      "name": "Reverse Lunge",
+      "search": "Reverse Lunge exercise tutorial proper form",
+      "youtube": ""
+    },
+    "step-up": {
+      "name": "Step-Up",
+      "search": "Step-Up exercise tutorial proper form",
+      "youtube": ""
+    },
+    "single-leg-rdl": {
+      "name": "Single-Leg Romanian Deadlift",
+      "search": "Single-Leg Romanian Deadlift exercise tutorial proper form",
+      "youtube": ""
+    },
+    "glute-bridge": {
+      "name": "Glute Bridge",
+      "search": "Glute Bridge exercise tutorial proper form",
+      "youtube": ""
+    },
+    "calf-raise": {
+      "name": "Calf Raise",
+      "search": "Calf Raise exercise tutorial proper form",
+      "youtube": ""
+    },
+    "push-up": {
+      "name": "Push-Up",
+      "search": "Push-Up exercise tutorial proper form",
+      "youtube": ""
+    },
+    "dumbbell-row": {
+      "name": "Dumbbell Row",
+      "search": "Dumbbell Row exercise tutorial proper form",
+      "youtube": ""
+    },
+    "overhead-press": {
+      "name": "Overhead Press",
+      "search": "Overhead Press exercise tutorial proper form",
+      "youtube": ""
+    },
+    "pull-up": {
+      "name": "Pull-Up",
+      "search": "Pull-Up exercise tutorial proper form",
+      "youtube": ""
+    },
+    "plank": {
+      "name": "Plank",
+      "search": "Plank exercise tutorial proper form",
+      "youtube": ""
+    },
+    "side-plank": {
+      "name": "Side Plank",
+      "search": "Side Plank exercise tutorial proper form",
+      "youtube": ""
+    },
+    "dead-bug": {
+      "name": "Dead Bug",
+      "search": "Dead Bug exercise tutorial proper form",
+      "youtube": ""
+    },
+    "bird-dog": {
+      "name": "Bird Dog",
+      "search": "Bird Dog exercise tutorial proper form",
+      "youtube": ""
+    },
+    "jumping-jack": {
+      "name": "Jumping Jack",
+      "search": "Jumping Jack exercise tutorial proper form",
+      "youtube": ""
+    },
+    "mountain-climber": {
+      "name": "Mountain Climber",
+      "search": "Mountain Climber exercise tutorial proper form",
+      "youtube": ""
+    },
+    "burpee": {
+      "name": "Burpee",
+      "search": "Burpee exercise tutorial proper form",
+      "youtube": ""
+    },
+    "cat-cow": {
+      "name": "Cat-Cow",
+      "search": "Cat-Cow exercise tutorial proper form",
+      "youtube": ""
+    },
+    "worlds-greatest-stretch": {
+      "name": "World's Greatest Stretch",
+      "search": "World's Greatest Stretch exercise tutorial proper form",
+      "youtube": ""
+    },
+    "hip-flexor-stretch": {
+      "name": "Hip Flexor Stretch",
+      "search": "Hip Flexor Stretch exercise tutorial proper form",
+      "youtube": ""
+    },
+    "hamstring-stretch": {
+      "name": "Hamstring Stretch",
+      "search": "Hamstring Stretch exercise tutorial proper form",
+      "youtube": ""
+    },
+    "easy-run": {
+      "name": "Easy Run",
+      "search": "Easy Run exercise tutorial proper form",
+      "youtube": ""
+    },
+    "interval-run": {
+      "name": "Interval Run",
+      "search": "Interval Run exercise tutorial proper form",
+      "youtube": ""
+    },
+    "tempo-run": {
+      "name": "Tempo Run",
+      "search": "Tempo Run exercise tutorial proper form",
+      "youtube": ""
+    },
+    "long-run": {
+      "name": "Long Run",
+      "search": "Long Run exercise tutorial proper form",
+      "youtube": ""
+    },
+    "freestyle-catch-up": {
+      "name": "Freestyle Catch-Up Drill",
+      "search": "Freestyle Catch-Up Drill exercise tutorial proper form",
+      "youtube": ""
+    },
+    "kick-set": {
+      "name": "Kick Set",
+      "search": "Kick Set exercise tutorial proper form",
+      "youtube": ""
+    },
+    "pull-buoy-set": {
+      "name": "Pull Buoy Set",
+      "search": "Pull Buoy Set exercise tutorial proper form",
+      "youtube": ""
+    },
+    "swim-intervals": {
+      "name": "Freestyle Intervals",
+      "search": "Freestyle Intervals exercise tutorial proper form",
+      "youtube": ""
+    }
+  },
+  "workouts": {
+    "full-body-basics": {
+      "title": "Full-Body Strength Basics",
+      "search": "Full-Body Strength Basics 30 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "no-equipment-hiit": {
+      "title": "20-Minute No-Equipment HIIT",
+      "search": "20-Minute No-Equipment HIIT 20 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "lower-body-gym": {
+      "title": "Lower Body Power",
+      "search": "Lower Body Power 45 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "upper-body-push-pull": {
+      "title": "Upper Body Push & Pull",
+      "search": "Upper Body Push & Pull 40 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "core-stability": {
+      "title": "Core Stability in 15",
+      "search": "Core Stability in 15 15 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "morning-mobility": {
+      "title": "Morning Mobility Flow",
+      "search": "Morning Mobility Flow 12 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "recovery-stretch": {
+      "title": "Post-Run Recovery Stretch",
+      "search": "Post-Run Recovery Stretch 15 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "runners-strength": {
+      "title": "Runner's Strength Circuit",
+      "search": "Runner's Strength Circuit 25 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "swimmers-dryland": {
+      "title": "Swimmer's Dryland Strength",
+      "search": "Swimmer's Dryland Strength 30 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "advanced-full-body": {
+      "title": "Advanced Full-Body Strength",
+      "search": "Advanced Full-Body Strength 50 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    },
+    "cardio-ladder": {
+      "title": "Bodyweight Cardio Ladder",
+      "search": "Bodyweight Cardio Ladder 30 minute follow along workout",
+      "youtube": "",
+      "thumbnail": ""
+    }
+  }
+}

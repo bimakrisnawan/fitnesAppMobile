@@ -1,0 +1,465 @@
+// Fitness coaching app schema.
+// Conventions: uuid ids, timestamptz for every point in time, IDR amounts as integers (no minor unit).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CLIENT
+  COACH
+  ADMIN
+}
+
+enum FitnessLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Specialization {
+  RUNNING
+  SWIMMING
+  GENERAL
+}
+
+enum Tier {
+  MONTHLY
+  COACHING
+}
+
+enum SubscriptionStatus {
+  PENDING // created, awaiting first payment
+  ACTIVE
+  PAUSED
+  CANCELLED // user cancelled; access continues until currentPeriodEnd
+  EXPIRED // period ended without renewal payment
+}
+
+enum PaymentStatus {
+  PENDING
+  SETTLED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum WorkoutCategory {
+  STRENGTH
+  CARDIO
+  FLEXIBILITY
+  SPORT_SPECIFIC
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum SessionType {
+  ONLINE
+  OFFLINE
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  SESSION_REMINDER
+  SESSION_SCHEDULED
+  NEW_PLAN
+  PAYMENT_SUCCESS
+  RENEWAL_REMINDER
+}
+
+enum PaymentProvider {
+  MAYAR
+}
+
+enum PaymentEventType {
+  CREATED // invoice created at the provider
+  PROVIDER_ERROR // provider call failed
+  WEBHOOK_RECEIVED
+  WEBHOOK_UNMATCHED // webhook we couldn't tie to a payment
+  WEBHOOK_REJECTED // bad token
+  VERIFIED // provider API confirmed the payment
+  SETTLED // subscription extended
+  EXPIRED
+}
+
+/// Equipment needed for a library workout, for the Gym / Home / No-equipment filter.
+enum EquipmentSetting {
+  GYM
+  HOME
+  NONE
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+// ─── Identity ─────────────────────────────────────────────────────────────────
+
+/// Clients, coaches and admins share one table; `role` decides what they can do.
+model User {
+  id                      String          @id @default(uuid()) @db.Uuid
+  email                   String          @unique
+  passwordHash            String
+  fullName                String
+  role                    Role            @default(CLIENT)
+  birthYear               Int?
+  fitnessLevel            FitnessLevel?
+  goals                   String?
+  preferredSpecialization Specialization?
+  /// AES-256-GCM ciphertext (see src/lib/crypto.ts). Mayar invoices require a mobile number.
+  phoneEncrypted          String?
+  createdAt               DateTime        @default(now()) @db.Timestamptz
+  updatedAt               DateTime        @updatedAt @db.Timestamptz
+
+  coachProfile         CoachProfile?
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  pushTokens           PushToken[]
+  subscriptions        Subscription[]       @relation("SubscriptionClient")
+  coachedSubscriptions Subscription[]       @relation("SubscriptionCoach")
+  payments             Payment[]
+  workoutCompletions   WorkoutCompletion[]
+  plansAsClient        CoachingPlan[]       @relation("PlanClient")
+  plansAsCoach         CoachingPlan[]       @relation("PlanCoach")
+  exerciseLogs         ExerciseLog[]
+  sessionsAsClient     CoachingSession[]    @relation("SessionClient")
+  sessionsAsCoach      CoachingSession[]    @relation("SessionCoach")
+  notifications        Notification[]
+}
+
+model CoachProfile {
+  userId          String         @id @db.Uuid
+  specialization  Specialization
+  bio             String?
+  experienceYears Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Opaque refresh tokens, stored hashed. Rotated on every use; reuse of a revoked token revokes the whole family.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz
+  revokedAt DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Expo push tokens, one row per device.
+model PushToken {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  token      String         @unique
+  platform   DevicePlatform
+  createdAt  DateTime       @default(now()) @db.Timestamptz
+  lastSeenAt DateTime       @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Billing ──────────────────────────────────────────────────────────────────
+
+/// QRIS cannot be charged automatically, so a "renewal" is a new Payment that extends currentPeriodEnd.
+/// A user has access while status is ACTIVE or CANCELLED and currentPeriodEnd is in the future.
+model Subscription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @db.Uuid
+  tier               Tier
+  status             SubscriptionStatus @default(PENDING)
+  coachId            String?            @db.Uuid // assigned coach (COACHING tier only)
+  specialization     Specialization? // requested track (COACHING tier only)
+  currentPeriodStart DateTime?          @db.Timestamptz
+  currentPeriodEnd   DateTime?          @db.Timestamptz
+  cancelledAt        DateTime?          @db.Timestamptz
+  pausedAt           DateTime?          @db.Timestamptz
+  createdAt          DateTime           @default(now()) @db.Timestamptz
+  updatedAt          DateTime           @updatedAt @db.Timestamptz
+
+  user     User      @relation("SubscriptionClient", fields: [userId], references: [id], onDelete: Cascade)
+  coach    User?     @relation("SubscriptionCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  payments Payment[]
+
+  /// One row per user and tier; renewals extend it rather than creating new rows.
+  @@unique([userId, tier])
+  @@index([currentPeriodEnd])
+}
+
+model Payment {
+  id                    String          @id @default(uuid()) @db.Uuid
+  userId                String          @db.Uuid
+  subscriptionId        String          @db.Uuid
+  orderId               String          @unique // our reference, shown on receipts
+  idempotencyKey        String?         @unique // client-supplied, so a double tap doesn't create two invoices
+  provider              PaymentProvider @default(MAYAR)
+  providerInvoiceId     String?         @unique // Mayar invoice id
+  providerTransactionId String?         @unique // Mayar transaction id
+  paymentUrl            String? // Mayar hosted checkout page (shows the QRIS code)
+  tier                  Tier
+  amount                Int // IDR, whole rupiah
+  currency              String          @default("IDR")
+  status                PaymentStatus   @default(PENDING)
+  expiresAt             DateTime?       @db.Timestamptz
+  paidAt                DateTime?       @db.Timestamptz
+  periodStart           DateTime?       @db.Timestamptz // subscription period this payment covers
+  periodEnd             DateTime?       @db.Timestamptz
+  createdAt             DateTime        @default(now()) @db.Timestamptz
+  updatedAt             DateTime        @updatedAt @db.Timestamptz
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subscription Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  events       PaymentEvent[]
+
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
+}
+
+/// Append-only audit trail of everything that happens to a payment, including webhooks we couldn't match.
+model PaymentEvent {
+  id        String           @id @default(uuid()) @db.Uuid
+  paymentId String?          @db.Uuid
+  type      PaymentEventType
+  data      Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime         @default(now()) @db.Timestamptz
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, createdAt])
+}
+
+// ─── Content ──────────────────────────────────────────────────────────────────
+
+/// Shared exercise catalog, used by library workouts and coaching plans.
+/// `alternatives`: [{ "setting": "home" | "minimal" | "outdoor", "replace": "dumbbell", "with": "water bottle", "note"?: string }]
+model Exercise {
+  id               String   @id @default(uuid()) @db.Uuid
+  /// Stable key for seeded/catalog content (e.g. "goblet-squat"); null for coach-created items.
+  slug             String?  @unique
+  name             String
+  description      String?
+  youtubeVideoId   String?
+  equipment        String[]
+  /// Muscle ids from src/lib/muscles.ts, e.g. ["biceps"]. Shown on the body map.
+  primaryMuscles   String[] @default([])
+  secondaryMuscles String[] @default([])
+  alternatives     Json     @default("[]")
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @updatedAt @db.Timestamptz
+
+  workoutItems  WorkoutExercise[]
+  planExercises PlanExercise[]
+
+  @@index([name])
+}
+
+/// Self-guided workouts in the Monthly membership library.
+model Workout {
+  id               String           @id @default(uuid()) @db.Uuid
+  /// Stable key for seeded content (e.g. "full-body-basics").
+  slug             String?          @unique
+  title            String
+  description      String?
+  category         WorkoutCategory
+  specialization   Specialization? // set for SPORT_SPECIFIC workouts
+  difficulty       FitnessLevel
+  durationMinutes  Int
+  equipment        String[]
+  equipmentSetting EquipmentSetting
+  youtubeVideoId   String? // full follow-along video, if any
+  thumbnailUrl     String?
+  isPublished      Boolean          @default(false)
+  createdAt        DateTime         @default(now()) @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @db.Timestamptz
+
+  exercises   WorkoutExercise[]
+  completions WorkoutCompletion[]
+
+  @@index([category, difficulty])
+  @@index([equipmentSetting])
+  @@index([isPublished])
+}
+
+model WorkoutExercise {
+  id              String  @id @default(uuid()) @db.Uuid
+  workoutId       String  @db.Uuid
+  exerciseId      String  @db.Uuid
+  position        Int
+  sets            Int?
+  reps            Int?
+  durationSeconds Int?
+  restSeconds     Int?
+  notes           String?
+
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([workoutId, position])
+}
+
+model WorkoutCompletion {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  workoutId   String   @db.Uuid
+  completedAt DateTime @default(now()) @db.Timestamptz
+  notes       String?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+}
+
+// ─── 1-on-1 coaching ──────────────────────────────────────────────────────────
+
+model CoachingPlan {
+  id             String         @id @default(uuid()) @db.Uuid
+  clientId       String         @db.Uuid
+  coachId        String         @db.Uuid
+  specialization Specialization
+  title          String
+  description    String?
+  status         PlanStatus     @default(DRAFT)
+  startDate      DateTime       @db.Date
+  endDate        DateTime?      @db.Date
+  createdAt      DateTime       @default(now()) @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @db.Timestamptz
+
+  client    User              @relation("PlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  coach     User              @relation("PlanCoach", fields: [coachId], references: [id], onDelete: Restrict)
+  exercises PlanExercise[]
+  sessions  CoachingSession[]
+
+  @@index([clientId, status])
+  @@index([coachId])
+}
+
+/// One prescribed item in a plan. Copies name/video from the catalog so coaches can tweak per client.
+/// Distance/pace fields cover running and swimming sets as well as strength work.
+model PlanExercise {
+  id               String   @id @default(uuid()) @db.Uuid
+  planId           String   @db.Uuid
+  exerciseId       String?  @db.Uuid
+  name             String
+  youtubeVideoId   String?
+  weekNumber       Int      @default(1)
+  dayOfWeek        Int // 1 = Monday … 7 = Sunday
+  position         Int
+  sets             Int?
+  reps             Int?
+  durationSeconds  Int?
+  distanceMeters   Int?
+  targetPace       String? // e.g. "5:30/km", "1:45/100m"
+  equipment        String[]
+  primaryMuscles   String[] @default([])
+  secondaryMuscles String[] @default([])
+  alternatives     Json     @default("[]") // same shape as Exercise.alternatives
+  notes            String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @updatedAt @db.Timestamptz
+
+  plan     CoachingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercise Exercise?     @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  logs     ExerciseLog[]
+
+  @@index([planId, weekNumber, dayOfWeek, position])
+}
+
+model ExerciseLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  planExerciseId  String   @db.Uuid
+  completedAt     DateTime @default(now()) @db.Timestamptz
+  setsCompleted   Int?
+  repsCompleted   Int?
+  weightKg        Decimal? @db.Decimal(6, 2)
+  durationSeconds Int?
+  distanceMeters  Int?
+  notes           String?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planExercise PlanExercise @relation(fields: [planExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+}
+
+model CoachingSession {
+  id              String        @id @default(uuid()) @db.Uuid
+  planId          String?       @db.Uuid
+  coachId         String        @db.Uuid
+  clientId        String        @db.Uuid
+  type            SessionType
+  startsAt        DateTime      @db.Timestamptz
+  durationMinutes Int           @default(45)
+  meetUrl         String? // ONLINE sessions
+  location        String? // OFFLINE sessions
+  status          SessionStatus @default(SCHEDULED)
+  notes           String?
+  reminderSentAt  DateTime?     @db.Timestamptz
+  createdAt       DateTime      @default(now()) @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @db.Timestamptz
+
+  plan   CoachingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  coach  User          @relation("SessionCoach", fields: [coachId], references: [id], onDelete: Restrict)
+  client User          @relation("SessionClient", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, startsAt])
+  @@index([coachId, startsAt])
+  @@index([status, startsAt])
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?        @db.Timestamptz
+  createdAt DateTime         @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
